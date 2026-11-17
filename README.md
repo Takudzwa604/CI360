@@ -1,12 +1,11 @@
-# 2026_ia626_manyikt_tshabas_finalProject
-# Customer Intelligence API
+# CI360: Customer Intelligence API
 
 * A Data Engineering + Analytics + ML System built on the H&M Dataset
 
 ---
 ## Project Structure
 
-2026_IA626_MANYIKT_TSHABAS_FINALPROJECT/
+CI360/
 │
 ├── api/
 │   ├── main_optimized.py      (the FastAPI app)
@@ -26,6 +25,8 @@
 ├── transactions.csv            (git-ignored)
 │
 ├── db_config.py               (DB connection for scripts; reads api/.env)
+├── resume_transactions_load.py (resumes an interrupted hm_transactions load)
+├── duckdb_metrics.py          (computes summaries + customer metrics locally, pushes to MySQL)
 ├── churn_pipeline.py          (shared churn features, labels and model)
 ├── churn_model.py             (out-of-time churn model evaluation)
 ├── Populate_Churn_score.py    (writes hm_customers.churn_risk_score)
