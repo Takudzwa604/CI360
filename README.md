@@ -10,7 +10,8 @@ CI360/
 ├── api/
 │   ├── main_optimized.py      (the FastAPI app)
 │   ├── recommender.py         (offline recommender; not served by the API)
-│   ├── .env                  (git-ignored - DB credentials, MODEL_PATH)
+│   ├── .env                  (git-ignored - DB credentials; copy from .env.example)
+│   ├── .env.example          (template listing the required DB_* variables)
 │   │
 │   ├── model/
 │   │   └── model.pkl          
@@ -292,7 +293,15 @@ All charts are rendered using Plotly and embedded in HTML.
 pip install -r requirements.txt
 ```
 
-## 2. Start MySQL
+## 2. Start MySQL and configure credentials
+
+Copy the template and fill in your MySQL connection details:
+
+```bash
+cp api/.env.example api/.env
+```
+
+`api/.env` is git-ignored, so your credentials stay local.
 
 ---
 
