@@ -1,0 +1,22 @@
+"""
+DEPRECATED - superseded by scripts/train_model.py
+
+This script used to hardcode the class MySQL credentials directly in source
+and only produced a bare PopularityRecommender. That's replaced now:
+
+  * Credentials come from api/.env (same file main.py already uses), instead
+    of being hardcoded here.
+  * scripts/train_model.py trains a real HybridRecommender - implicit-feedback
+    collaborative filtering (ALS) for customers with enough purchase history,
+    falling back to the popularity/category logic for everyone else - rather
+    than just pickling an empty PopularityRecommender(limit=10).
+
+Run `python scripts/train_model.py` instead of this file. This file is kept
+only so nothing that referenced the old path breaks silently; it intentionally
+does nothing.
+"""
+
+if __name__ == "__main__":
+    raise SystemExit(
+        "This script is deprecated. Run 'python scripts/train_model.py' instead."
+    )
