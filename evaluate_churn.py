@@ -8,7 +8,7 @@ See churn_pipeline.py for the churn definition. This script:
   4. retrains on the most recent labelled period and prints the top at-risk
      customers as of T.
 
-It writes nothing to the database. Populate_Churn_score.py stores scores in
+It writes nothing to the database. score_churn.py stores scores in
 hm_customers.churn_risk_score, which is what the API reads.
 """
 import sys

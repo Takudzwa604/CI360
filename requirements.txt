@@ -1,19 +1,15 @@
-# Core API
+# API (api/main_optimized.py)
 fastapi>=0.110
 uvicorn[standard]>=0.29
 pymysql>=1.1
 cryptography>=42      # required by pymysql for MySQL 8 caching_sha2_password logins
 python-dotenv>=1.0
-plotly>=5.20
 DBUtils>=3.0
-
-# Model runtime (api/recommender.py itself only needs numpy)
-numpy>=1.26
-
-# Offline model training only (scripts/train_model.py) - not needed to serve the API
-implicit>=0.7
-scipy>=1.11
-
-# If you use Data.ipynb for exploration/ETL
+plotly>=5.20
 pandas>=2.2
+
+# Churn model (churn_pipeline.py, evaluate_churn.py, score_churn.py)
 scikit-learn>=1.4
+
+# Analytics build (duckdb_metrics.py)
+duckdb>=1.0

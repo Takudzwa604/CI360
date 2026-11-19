@@ -24,7 +24,7 @@ Summary tables are built under *_new names and swapped in atomically, so the API
 never sees a half-built table. The swap replaces article_summary, which drops its
 foreign key, so re-run setup_relationships.sql afterwards.
 
-Then run Populate_Churn_score.py and build_crm_customers.py (which assigns segments).
+Then run score_churn.py and build_crm_customers.py (which assigns segments).
 """
 import functools
 import sys

@@ -158,7 +158,7 @@ def get_customer_churn_risk(customer_id: str):
     # Add risk level classification
     score = row.get('churn_risk_score')
     if score is None:
-        # Customers with no transactions are never scored by Populate_Churn_score.py
+        # Customers with no transactions are never scored by score_churn.py
         row['risk_level'] = "NOT SCORED"
     elif score >= 0.8:
         row['risk_level'] = "VERY HIGH"
@@ -772,4 +772,4 @@ def dashboard():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001, log_level="info")
+    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")

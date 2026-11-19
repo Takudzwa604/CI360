@@ -3,7 +3,7 @@ Build the crm_customers table: one row per purchasing customer, with everything
 the CRM screens need (segment, value, churn risk, revenue at risk), indexed for
 fast filtering and sorting.
 
-Run after duckdb_metrics.py push and Populate_Churn_score.py (and again whenever
+Run after duckdb_metrics.py push and score_churn.py (and again whenever
 customer metrics or scores change):
     python build_crm_customers.py
 
@@ -149,7 +149,7 @@ def main():
         print(f"  Without a segment:      {no_segment:,}")
         print(f"  Total revenue at risk:  {rar}")
         if scored < total:
-            print("  Note: unscored customers show as NOT SCORED. Run Populate_Churn_score.py, then rebuild.")
+            print("  Note: unscored customers show as NOT SCORED. Run score_churn.py, then rebuild.")
         print(f"\nOK: crm_customers ready ({time.time() - start:.0f}s)")
     except Exception as e:
         conn.rollback()

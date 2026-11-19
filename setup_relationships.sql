@@ -8,7 +8,7 @@ USE manyikt_Customer_Intelligence;
 -- ============================================
 -- 1. Drop churn_predictions table (no longer needed)
 --    Churn scores live in hm_customers.churn_risk_score
---    (written by Populate_Churn_score.py, read by the API).
+--    (written by score_churn.py, read by the API).
 -- ============================================
 DROP TABLE IF EXISTS churn_predictions;
 

@@ -1,6 +1,6 @@
 """
-Shared churn pipeline used by churn_model.py (evaluation) and
-Populate_Churn_score.py (scoring).
+Shared churn pipeline used by evaluate_churn.py (evaluation) and
+score_churn.py (scoring).
 
 Churn definition (forward-looking, no label leakage):
     For a cutoff date C, features are computed ONLY from transactions on or

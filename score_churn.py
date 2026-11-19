@@ -7,7 +7,7 @@ most recent fully labelled period and scores every customer who has at least
 one transaction. Customers with no transactions are left NULL; the API
 reports them as "NOT SCORED".
 
-Run churn_model.py to see the out-of-time evaluation for this model.
+Run evaluate_churn.py to see the out-of-time evaluation for this model.
 """
 import sys
 import time
@@ -101,7 +101,7 @@ for i in range(0, total_rows, batch_size):
             conn = get_connection(read_timeout=1800, write_timeout=1800)
             cur = conn.cursor()
 
-print(f"\n  Applying scores to hm_customers...")
+print("\n  Applying scores to hm_customers...")
 try:
     conn.ping(reconnect=True)
     # LEFT JOIN: customers with no transactions get NULL, clearing any stale score.
