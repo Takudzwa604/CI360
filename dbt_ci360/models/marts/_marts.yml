@@ -1,0 +1,57 @@
+version: 2
+
+models:
+  - name: article_summary
+    description: Units sold, unique buyers and revenue per product.
+    columns:
+      - name: article_id
+        data_tests: [unique, not_null]
+
+  - name: monthly_revenue
+    description: Revenue per month, Sep 2018 - Sep 2020.
+    columns:
+      - name: month
+        data_tests: [unique, not_null]
+
+  - name: customer_metrics
+    description: Lifetime value, purchase counts, dates and cohort for every registered customer.
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: customer_lifetime_value
+        description: Total spend rounded to 2 decimals; 0 for customers who never bought.
+        data_tests: [not_null]
+
+  - name: customer_segments
+    description: Value + recency segment and expected 90-day spend for each purchasing customer.
+    columns:
+      - name: customer_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments: {to: ref('customer_metrics'), field: customer_id}
+      - name: segment
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments: {values: ['High-Value Loyal', 'Growth Potential', 'One-Time', 'Dormant', 'At-Risk']}
+      - name: expected_90d_spend
+        description: Lifetime value x 90 / max(tenure days, 90).
+
+exposures:
+  - name: ci360_api
+    type: application
+    label: CI360 API and dashboard
+    maturity: medium
+    url: http://127.0.0.1:8000/dashboard
+    description: >
+      FastAPI dashboard and At-Risk Worklist. These tables are pushed to MySQL
+      (push_metrics.py), combined with churn scores in crm_customers, and served by the API.
+    depends_on:
+      - ref('article_summary')
+      - ref('monthly_revenue')
+      - ref('customer_metrics')
+      - ref('customer_segments')
+    owner:
+      name: Takudzwa Manyika

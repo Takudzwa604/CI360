@@ -1,0 +1,21 @@
+name: ci360
+version: "1.0.0"
+config-version: 2
+profile: ci360
+
+model-paths: ["models"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  data_dir: ".."                    # folder holding the H&M CSVs (the project root)
+  expected_transactions: 31788324   # rows in transactions.csv
+
+models:
+  ci360:
+    staging:
+      +materialized: table          # read the CSVs once; every mart reuses these
+      +schema: staging
+    marts:
+      +materialized: table

@@ -1,0 +1,21 @@
+version: 2
+
+sources:
+  - name: hm
+    description: Raw H&M Personalized Fashion Recommendations CSVs, read in place by DuckDB.
+    tables:
+      - name: transactions
+        description: One row per item purchased (31.8M rows, Sep 2018 - Sep 2020).
+        meta:
+          external_location: >-
+            read_csv('{{ var("data_dir") }}/transactions.csv', header=true,
+              types=['DATE', 'VARCHAR', 'BIGINT', 'DECIMAL(10,5)', 'INTEGER'])
+      - name: customers
+        description: One row per registered customer (1.37M rows). Read as text and cleaned in staging.
+        meta:
+          external_location: "read_csv('{{ var(\"data_dir\") }}/customers.csv', header=true, all_varchar=true)"
+      - name: articles
+        description: Product catalogue (105K rows).
+        meta:
+          external_location: >-
+            read_csv('{{ var("data_dir") }}/articles.csv', header=true, all_varchar=true)

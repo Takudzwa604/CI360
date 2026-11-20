@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: stg_transactions
+    description: Typed transactions. Exact duplicates are kept because each is a unit sold.
+    columns:
+      - name: t_dat
+        data_tests: [not_null]
+      - name: customer_id
+        description: Buyer; must exist in customers.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('stg_customers'), field: customer_id}
+      - name: article_id
+        description: Product; must exist in the catalogue.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('stg_articles'), field: article_id}
+      - name: price
+        description: Scaled price (dataset units, not currency), DECIMAL(10,5).
+        data_tests: [not_null]
+      - name: sales_channel_id
+        description: 1 = store, 2 = online.
+        data_tests:
+          - accepted_values:
+              arguments: {values: [1, 2]}
+
+  - name: stg_customers
+    description: Registered customers with cleaned age and postal code.
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: age
+        description: NULL when missing in the source (about 1.2%); never imputed.
+      - name: is_placeholder_postal_code
+        description: True for the hashed postal code shared by ~120K customers.
+
+  - name: stg_articles
+    description: Product catalogue with numeric article_id.
+    columns:
+      - name: article_id
+        data_tests: [unique, not_null]
+      - name: detail_desc
+        description: NULL for the 416 products with no description.

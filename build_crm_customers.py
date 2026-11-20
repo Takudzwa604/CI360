@@ -3,24 +3,20 @@ Build the crm_customers table: one row per purchasing customer, with everything
 the CRM screens need (segment, value, churn risk, revenue at risk), indexed for
 fast filtering and sorting.
 
-Run after duckdb_metrics.py push and score_churn.py (and again whenever
-customer metrics or scores change):
+Run after push_metrics.py and score_churn.py (and again whenever customer
+metrics or scores change):
     python build_crm_customers.py
 
-Definitions (dataset end = latest last_purchase_date in hm_customers):
-    days_since_last_purchase = days from last purchase to dataset end
-    segment                  = value + recency rules, first match wins:
-                               High-Value Loyal  CLV >= 1.50 and last purchase < 30 days ago
-                               Growth Potential  CLV >= 0.75 and last purchase 31-90 days ago
-                               Dormant           last purchase > 180 days ago
-                               At-Risk           last purchase 91-180 days ago
-                               One-Time          everyone else
-    expected_90d_spend       = customer_lifetime_value * 90 / max(tenure_days, 90)
-                               (average 90-day spend over the customer's history)
-    revenue_at_risk          = churn_risk_score * expected_90d_spend
-                               (expected spend lost in the next 90 days if they churn)
-    risk_level               = VERY HIGH / HIGH / MEDIUM / LOW / VERY LOW by score,
-                               NOT SCORED when churn_risk_score is NULL
+Where each column comes from:
+    segment, days_since_last_purchase, expected_90d_spend
+                             dbt (dbt_ci360/models/marts), pushed to hm_customers
+                             by push_metrics.py. The segment rules live only in
+                             customer_segments.sql.
+    churn_risk_score         score_churn.py
+    risk_level               VERY HIGH / HIGH / MEDIUM / LOW / VERY LOW by score,
+                             NOT SCORED when churn_risk_score is NULL
+    revenue_at_risk          churn_risk_score * expected_90d_spend
+                             (expected spend lost in the next 90 days if they churn)
 
 Customers with no purchases (customer_lifetime_value = 0) are excluded.
 The new table is built under a temporary name and swapped in atomically, so the
@@ -67,24 +63,15 @@ INSERT_SQL = """
 INSERT INTO crm_customers_new
 SELECT
     c.customer_id,
-    CASE
-        WHEN c.customer_lifetime_value >= 1.50
-             AND DATEDIFF(%(end)s, c.last_purchase_date) < 30                 THEN 'High-Value Loyal'
-        WHEN c.customer_lifetime_value >= 0.75
-             AND DATEDIFF(%(end)s, c.last_purchase_date) BETWEEN 31 AND 90    THEN 'Growth Potential'
-        WHEN DATEDIFF(%(end)s, c.last_purchase_date) > 180                    THEN 'Dormant'
-        WHEN DATEDIFF(%(end)s, c.last_purchase_date) BETWEEN 91 AND 180       THEN 'At-Risk'
-        ELSE 'One-Time'
-    END                                                                       AS segment,
+    c.segment,
     c.age,
     c.cohort_month,
     c.first_purchase_date,
     c.last_purchase_date,
-    DATEDIFF(%(end)s, c.last_purchase_date)                                   AS days_since_last_purchase,
+    c.days_since_last_purchase,
     c.total_transactions,
     c.customer_lifetime_value,
-    c.customer_lifetime_value * 90
-        / GREATEST(DATEDIFF(%(end)s, c.first_purchase_date), 90)              AS expected_90d_spend,
+    c.expected_90d_spend,
     c.churn_risk_score,
     CASE
         WHEN c.churn_risk_score IS NULL THEN 'NOT SCORED'
@@ -93,9 +80,8 @@ SELECT
         WHEN c.churn_risk_score >= 0.4 THEN 'MEDIUM'
         WHEN c.churn_risk_score >= 0.2 THEN 'LOW'
         ELSE 'VERY LOW'
-    END                                                                       AS risk_level,
-    c.churn_risk_score * c.customer_lifetime_value * 90
-        / GREATEST(DATEDIFF(%(end)s, c.first_purchase_date), 90)              AS revenue_at_risk
+    END                                          AS risk_level,
+    c.churn_risk_score * c.expected_90d_spend    AS revenue_at_risk
 FROM hm_customers c
 WHERE c.customer_lifetime_value > 0
 """
@@ -107,16 +93,23 @@ def main():
         cur = conn.cursor()
         start = time.time()
 
-        cur.execute("SELECT MAX(last_purchase_date) FROM hm_customers")
-        (end_date,) = cur.fetchone()
-        if end_date is None:
-            raise RuntimeError("hm_customers.last_purchase_date is empty")
-        print(f"Dataset end date: {end_date}")
+        # Segments come from dbt via push_metrics.py; refuse to build without them.
+        cur.execute("""
+            SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'hm_customers' AND COLUMN_NAME = 'segment'
+        """)
+        if not cur.fetchone()[0]:
+            raise RuntimeError("hm_customers.segment is missing. Run dbt build and push_metrics.py first.")
+        cur.execute("SELECT COUNT(*) FROM hm_customers WHERE customer_lifetime_value > 0 AND segment IS NULL")
+        (missing,) = cur.fetchone()
+        if missing:
+            raise RuntimeError(f"{missing:,} purchasing customers have no segment. "
+                               "Run dbt build and push_metrics.py first.")
 
         print("Building crm_customers_new...")
         cur.execute("DROP TABLE IF EXISTS crm_customers_new")
         cur.execute(CREATE_SQL)
-        cur.execute(INSERT_SQL, {"end": end_date})
+        cur.execute(INSERT_SQL)
         inserted = cur.rowcount
         conn.commit()
         print(f"  Inserted {inserted:,} customers ({time.time() - start:.0f}s)")

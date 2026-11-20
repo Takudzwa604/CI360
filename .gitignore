@@ -220,3 +220,16 @@ __marimo__/
 
 # Personal editor settings
 .vscode/
+
+# Personal / course documents kept alongside the project (never commit)
+SAA_STD_DS*.pdf
+gilberm_msda_reflection*.pdf
+Databricks Lakehouse Implementation Document*.pdf
+
+# Capstone submission documents
+submission/
+
+# dbt logs and packages
+dbt_ci360/logs/
+dbt_ci360/dbt_packages/
+dbt_ci360/.user.yml

@@ -1,0 +1,7 @@
+ci360:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ci360_dbt.duckdb        # read by ../push_metrics.py
+      threads: 4

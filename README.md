@@ -8,6 +8,7 @@ CI360 loads the H&M Personalized Fashion dataset into MySQL, works out who each 
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![MySQL](https://img.shields.io/badge/MySQL-8-4479A1?logo=mysql&logoColor=white)
 ![DuckDB](https://img.shields.io/badge/DuckDB-FFF000?logo=duckdb&logoColor=black)
+![dbt](https://img.shields.io/badge/dbt-FF694B?logo=dbt&logoColor=white)
 ![scikit-learn](https://img.shields.io/badge/scikit--learn-F7931E?logo=scikitlearn&logoColor=white)
 ![Plotly](https://img.shields.io/badge/Plotly-3F4F75?logo=plotly&logoColor=white)
 
@@ -94,7 +95,7 @@ FastAPI generates interactive documentation at `/docs`, where every endpoint can
 ```mermaid
 flowchart LR
     CSV["H&M CSVs<br/>transactions · customers · articles"]
-    DUCK["DuckDB (local)<br/>duckdb_metrics.py"]
+    DBT["dbt on DuckDB (local)<br/>dbt_ci360/ · 7 models, 27 tests"]
     MYSQL[("MySQL<br/>raw + derived tables")]
     CHURN["Churn model<br/>score_churn.py"]
     CRM["CRM build<br/>build_crm_customers.py"]
@@ -102,14 +103,14 @@ flowchart LR
     UI["Dashboard + JSON API"]
 
     CSV -->|batch load| MYSQL
-    CSV -->|aggregate in seconds| DUCK
-    DUCK -->|push summaries + customer metrics| MYSQL
+    CSV -->|build + test in ~1 min| DBT
+    DBT -->|push_metrics.py| MYSQL
     MYSQL --> CHURN -->|churn_risk_score| MYSQL
     MYSQL --> CRM -->|crm_customers| MYSQL
     MYSQL --> API --> UI
 ```
 
-**Why two engines?** MySQL holds the data the API serves. Heavy aggregation (per-customer lifetime value, monthly revenue, article summaries) runs in **DuckDB** straight from the CSVs on a laptop in under a minute. The same work as correlated `UPDATE`s on a remote MySQL server takes hours. Only the small results are pushed back.
+**Why MySQL, DuckDB and dbt?** MySQL holds the data the API serves. Heavy aggregation (per-customer lifetime value, segments, monthly revenue, article summaries) runs in **DuckDB** straight from the CSVs on a laptop in about a minute; the same work as correlated `UPDATE`s on a remote MySQL server is far slower. **dbt** organises that SQL into staging models (the data cleaning) and marts (metrics and segments), and runs 27 tests on every build: unique keys, no orphan transactions across all 31.8M rows, revenue reconciliation and a row count that must match the source. `push_metrics.py` copies the small results to MySQL only if the last build passed every test.
 
 ---
 
@@ -185,10 +186,10 @@ erDiagram
 | Table | Rows | Built by | Purpose |
 |---|---|---|---|
 | `hm_transactions` | 31.8M | `Data.ipynb` / `resume_transactions_load.py` | Every purchase. Indexed on `customer_id` and `article_id`. |
-| `hm_customers` | 1.37M | `Data.ipynb`, enriched by `duckdb_metrics.py push` and `score_churn.py` | Customer master plus lifetime metrics and churn score. |
+| `hm_customers` | 1.37M | `Data.ipynb`, enriched by `push_metrics.py` (from dbt) and `score_churn.py` | Customer master plus lifetime metrics, segment and churn score. |
 | `hm_articles` | 105K | `Data.ipynb` | Product catalogue. |
-| `article_summary` | 105K | `duckdb_metrics.py push` | Units sold, unique customers and revenue per article. |
-| `monthly_revenue` | 25 | `duckdb_metrics.py push` | Revenue per month. |
+| `article_summary` | 105K | dbt → `push_metrics.py` | Units sold, unique customers and revenue per article. |
+| `monthly_revenue` | 25 | dbt → `push_metrics.py` | Revenue per month. |
 | `crm_customers` | 1.36M | `build_crm_customers.py` | One indexed row per purchasing customer: everything the CRM screens need. |
 
 Foreign keys (`setup_relationships.sql`): transactions → customers and → articles use `ON DELETE RESTRICT`, so deleting a customer or product can never silently erase sales history. `article_summary` → articles cascades, because it is derived data.
@@ -207,7 +208,7 @@ Each purchasing customer gets one segment from their lifetime value and how long
 | **Dormant** | Last purchase > 180 days ago | 619,389 | 45.5% | 151,774 | 17.2% | 0.80 |
 | **At-Risk** | Last purchase 91–180 days ago | 217,322 | 16.0% | 114,564 | 13.0% | 0.56 |
 
-The rules live in one place: `build_crm_customers.py`.
+The rules live in one place: the dbt model `dbt_ci360/models/marts/customer_segments.sql`, where tests check that every buyer gets exactly one valid segment.
 
 ---
 
@@ -297,7 +298,7 @@ curl "http://127.0.0.1:8000/api/worklist?segment=High-Value%20Loyal&risk_level=H
 
 ## Getting started
 
-**Prerequisites:** Python 3.11+, a MySQL 8 database you can create tables in, and the three H&M CSVs in the project root.
+**Prerequisites:** Python 3.11+, Python 3.13 for dbt (dbt does not support 3.14 yet), a MySQL 8 database you can create tables in, and the three H&M CSVs in the project root.
 
 ```bash
 git clone https://github.com/Takudzwa604/CI360.git
@@ -318,8 +319,10 @@ cp api/.env.example api/.env     # then fill in DB_HOST, DB_PORT, DB_USER, DB_PA
 **3. Build the analytics** (in this order):
 
 ```bash
-python duckdb_metrics.py compute    # local: aggregate the CSVs with DuckDB (~1 min)
-python duckdb_metrics.py push       # write summaries + customer metrics to MySQL
+cd dbt_ci360                        # first time: py -3.13 -m venv .venv && .venv\Scripts\pip install dbt-duckdb
+.venv\Scripts\dbt build             # local: build + test metrics and segments from the CSVs (~1 min)
+cd ..
+python push_metrics.py              # copy results to MySQL (only if every dbt test passed)
 mysql < setup_relationships.sql     # foreign keys (or run it in your SQL client)
 python score_churn.py               # train the churn model and score every customer
 python build_crm_customers.py       # build crm_customers: segments, risk, revenue at risk
@@ -339,7 +342,7 @@ Then open `http://127.0.0.1:8000/dashboard` or `http://127.0.0.1:8000/docs`.
 
 ## Refreshing the data
 
-When the source CSVs change, repeat step 3 in the same order. `push` refuses to run unless MySQL holds exactly as many transactions as the CSV, so the summaries always match what the API serves. Summary tables and `crm_customers` are built under temporary names and swapped in atomically, so the API never sees a half-built table.
+When the source CSVs change, repeat step 3 in the same order. `push_metrics.py` refuses to run unless the last `dbt build` passed every test and MySQL holds exactly as many transactions as the dbt build, so the summaries always match what the API serves. `dbt docs generate && dbt docs serve` shows the lineage graph. Summary tables and `crm_customers` are built under temporary names and swapped in atomically, so the API never sees a half-built table.
 
 ---
 
@@ -352,7 +355,8 @@ CI360/
 │   └── .env.example               Template for DB credentials (copy to .env)
 ├── Data.ipynb                     Create tables and load the raw CSVs into MySQL
 ├── resume_transactions_load.py    Resume an interrupted transactions load safely
-├── duckdb_metrics.py              DuckDB aggregation (compute) + push to MySQL
+├── dbt_ci360/                     dbt project on DuckDB: cleaning, metrics, segments, tests
+├── push_metrics.py                Push the tested dbt tables to MySQL
 ├── setup_relationships.sql        Foreign keys, with orphan checks; safe to re-run
 ├── churn_pipeline.py              Churn definition, features, labels, model
 ├── evaluate_churn.py              Out-of-time churn evaluation vs. baseline
@@ -360,7 +364,6 @@ CI360/
 ├── build_crm_customers.py         Builds crm_customers (segments, risk, revenue at risk)
 ├── db_config.py                   Shared MySQL connection (reads api/.env)
 ├── pictures/                      README images
-├── CI360_Roadmap.pdf / .docx      Project roadmap
 └── requirements.txt
 ```
 
@@ -376,4 +379,4 @@ CI360/
 **Next steps**
 - Add an RFM score and cohort-retention view.
 - Track worklist outcomes (contacted, retained) to measure campaign impact.
-- Schedule the refresh pipeline and deploy the API to the cloud.
+- Schedule the refresh pipeline (dbt build → push → score → CRM) and deploy the API to the cloud.

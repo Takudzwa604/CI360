@@ -11,5 +11,7 @@ pandas>=2.2
 # Churn model (churn_pipeline.py, evaluate_churn.py, score_churn.py)
 scikit-learn>=1.4
 
-# Analytics build (duckdb_metrics.py)
-duckdb>=1.0
+# Push dbt results to MySQL (push_metrics.py); must read the file dbt writes
+duckdb>=2.0
+
+# dbt runs in its own Python 3.13 venv (dbt_ci360/.venv): pip install dbt-duckdb
